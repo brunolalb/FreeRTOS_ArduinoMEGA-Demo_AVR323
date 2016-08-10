@@ -30,9 +30,12 @@ CPP_DEPS :=
 
 # Every subdirectory with source files must be described here
 SUBDIRS := \
+FreeRTOS/Demo/Common/Minimal \
 FreeRTOS/Source \
 FreeRTOS/Source/portable/MemMang \
 FreeRTOS/Source/portable/WinAVR/ATmega2560 \
 ParTest \
+RegTest \
 . \
+serial \
 

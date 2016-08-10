@@ -8,10 +8,13 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
+-include serial/subdir.mk
+-include RegTest/subdir.mk
 -include ParTest/subdir.mk
 -include FreeRTOS/Source/portable/WinAVR/ATmega2560/subdir.mk
 -include FreeRTOS/Source/portable/MemMang/subdir.mk
 -include FreeRTOS/Source/subdir.mk
+-include FreeRTOS/Demo/Common/Minimal/subdir.mk
 -include subdir.mk
 -include objects.mk
 
@@ -49,47 +52,47 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 LSS += \
-FreeRTOS_ArduinoMEGA-Demo_Blinky.lss \
+FreeRTOS_ArduinoMEGA-Demo_AVR323.lss \
 
 FLASH_IMAGE += \
-FreeRTOS_ArduinoMEGA-Demo_Blinky.hex \
+FreeRTOS_ArduinoMEGA-Demo_AVR323.hex \
 
 SIZEDUMMY += \
 sizedummy \
 
 
 # All Target
-all: FreeRTOS_ArduinoMEGA-Demo_Blinky.elf secondary-outputs
+all: FreeRTOS_ArduinoMEGA-Demo_AVR323.elf secondary-outputs
 
 # Tool invocations
-FreeRTOS_ArduinoMEGA-Demo_Blinky.elf: $(OBJS) $(USER_OBJS)
+FreeRTOS_ArduinoMEGA-Demo_AVR323.elf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: AVR C++ Linker'
-	avr-g++ -Wl,-Map,FreeRTOS_ArduinoMEGA-Demo_Blinky.map,--cref -mrelax -Wl,--gc-sections -mmcu=atmega2560 -o "FreeRTOS_ArduinoMEGA-Demo_Blinky.elf" $(OBJS) $(USER_OBJS) $(LIBS)
+	avr-g++ -Wl,-Map,FreeRTOS_ArduinoMEGA-Demo_AVR323.map,--cref -mrelax -Wl,--gc-sections -mmcu=atmega2560 -o "FreeRTOS_ArduinoMEGA-Demo_AVR323.elf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
-FreeRTOS_ArduinoMEGA-Demo_Blinky.lss: FreeRTOS_ArduinoMEGA-Demo_Blinky.elf
+FreeRTOS_ArduinoMEGA-Demo_AVR323.lss: FreeRTOS_ArduinoMEGA-Demo_AVR323.elf
 	@echo 'Invoking: AVR Create Extended Listing'
-	-avr-objdump -h -S FreeRTOS_ArduinoMEGA-Demo_Blinky.elf  >"FreeRTOS_ArduinoMEGA-Demo_Blinky.lss"
+	-avr-objdump -h -S FreeRTOS_ArduinoMEGA-Demo_AVR323.elf  >"FreeRTOS_ArduinoMEGA-Demo_AVR323.lss"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-FreeRTOS_ArduinoMEGA-Demo_Blinky.hex: FreeRTOS_ArduinoMEGA-Demo_Blinky.elf
+FreeRTOS_ArduinoMEGA-Demo_AVR323.hex: FreeRTOS_ArduinoMEGA-Demo_AVR323.elf
 	@echo 'Create Flash image (ihex format)'
-	-avr-objcopy -R .eeprom -R .fuse -R .lock -R .signature -O ihex FreeRTOS_ArduinoMEGA-Demo_Blinky.elf  "FreeRTOS_ArduinoMEGA-Demo_Blinky.hex"
+	-avr-objcopy -R .eeprom -R .fuse -R .lock -R .signature -O ihex FreeRTOS_ArduinoMEGA-Demo_AVR323.elf  "FreeRTOS_ArduinoMEGA-Demo_AVR323.hex"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-sizedummy: FreeRTOS_ArduinoMEGA-Demo_Blinky.elf
+sizedummy: FreeRTOS_ArduinoMEGA-Demo_AVR323.elf
 	@echo 'Invoking: Print Size'
-	-avr-size --format=avr --mcu=atmega2560 FreeRTOS_ArduinoMEGA-Demo_Blinky.elf
+	-avr-size --format=avr --mcu=atmega2560 FreeRTOS_ArduinoMEGA-Demo_AVR323.elf
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(C_UPPER_DEPS)$(S_DEPS)$(LSS)$(C_DEPS)$(FLASH_IMAGE)$(CC_DEPS)$(ELFS)$(C++_DEPS)$(OBJS)$(CXX_DEPS)$(ASM_DEPS)$(SIZEDUMMY)$(S_UPPER_DEPS)$(CPP_DEPS) FreeRTOS_ArduinoMEGA-Demo_Blinky.elf
+	-$(RM) $(C_UPPER_DEPS)$(S_DEPS)$(LSS)$(C_DEPS)$(FLASH_IMAGE)$(CC_DEPS)$(ELFS)$(C++_DEPS)$(OBJS)$(CXX_DEPS)$(ASM_DEPS)$(SIZEDUMMY)$(S_UPPER_DEPS)$(CPP_DEPS) FreeRTOS_ArduinoMEGA-Demo_AVR323.elf
 	-@echo ' '
 
 secondary-outputs: $(LSS) $(FLASH_IMAGE) $(SIZEDUMMY)

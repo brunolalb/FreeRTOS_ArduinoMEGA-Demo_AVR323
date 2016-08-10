@@ -68,7 +68,7 @@
 */
 
 /*
- * Demo Blinky project
+ * Demo AVR323 project
  *
  * ArduinoMEGA with FreeRTOS 9.0.0
  *
@@ -76,31 +76,8 @@
  * Burner: AVR Dude (STK500v2)
  * IDE: Eclipse Mars.2
  *
- * Description::
- * main() creates one queue, and two tasks. It then starts the scheduler.
- *
- * The Queue Send Task:
- * The queue send task is implemented by the prvQueueSendTask() function in
- * this file.  prvQueueSendTask() sits in a loop that causes it to repeatedly
- * block for 200 (simulated as far as the scheduler is concerned, but in
- * reality much longer - see notes above) milliseconds, before sending the
- * value 100 to the queue that was created within main_blinky().  Once the
- * value is sent, the task loops back around to block for another 200
- * (simulated) milliseconds.
- *
- * The Queue Receive Task:
- * The queue receive task is implemented by the prvQueueReceiveTask() function
- * in this file.  prvQueueReceiveTask() sits in a loop where it repeatedly
- * blocks on attempts to read data from the queue that was created within
- * main_blinky().  When data is received, the task checks the value of the
- * data, and if the value equals the expected 100, outputs a message.  The
- * 'block time' parameter passed to the queue receive function specifies that
- * the task should be held in the Blocked state indefinitely to wait for data
- * to be available on the queue.  The queue receive task will only leave the
- * Blocked state when the queue send task writes to the queue.  As the queue
- * send task writes to the queue every 200 (simulated - see notes above)
- * milliseconds, the queue receive task leaves the Blocked state every 200
- * milliseconds, and therefore outputs a message every 200 milliseconds.
+ * Description:
+ * 	Implementation of the same Demo project available for AVR323 (WinAVR).
  *
  * Initial version (2016-08-05): Bruno Landau Albrecht (brunolalb@gmail.com)
  *
@@ -117,31 +94,59 @@
 
 /* Demo file headers. */
 #include "partest.h"
+#include "integer.h"
+#include "serial.h"
+#include "comtest.h"
+#include "PollQ.h"
+#include "RegTest/regtest.h"
+#include "crflash.h"
 
 /* Priority definitions for most of the tasks in the demo application.  Some
 tasks just use the idle priority. */
-#define mainQUEUE_RECEIVE_TASK_PRIORITY		( tskIDLE_PRIORITY + 2 )
-#define	mainQUEUE_SEND_TASK_PRIORITY		( tskIDLE_PRIORITY + 1 )
+#define mainDEMOBLINKY_RECEIVE_PRIORITY		( tskIDLE_PRIORITY + 2 )
+#define	mainDEMOBLINKY_SEND_PRIORITY		( tskIDLE_PRIORITY + 1 )
+#define mainCOM_TEST_PRIORITY				( tskIDLE_PRIORITY + 2 )
+#define mainQUEUE_POLL_PRIORITY				( tskIDLE_PRIORITY + 2 )
+#define mainCHECK_TASK_PRIORITY				( tskIDLE_PRIORITY + 3 )
+
+/* Baud rate used by the serial port tasks. */
+#define mainCOM_TEST_BAUD_RATE				( ( uint32_t ) 115200 )
 
 /* The rate at which data is sent to the queue.  The 200ms value is converted
 to ticks using the portTICK_PERIOD_MS constant. */
-#define mainQUEUE_SEND_FREQUENCY_MS			( ( TickType_t ) (200) / portTICK_PERIOD_MS )
+#define mainDEMOBLINKY_FREQUENCY_MS			( ( TickType_t ) (200) / portTICK_PERIOD_MS )
+
+/* The period between executions of the check task. */
+#define mainCHECK_PERIOD					( ( TickType_t ) 3000 / portTICK_PERIOD_MS  )
 
 /* The number of items the queue can hold.  This is 1 as the receive task
 will remove items as they are added, meaning the send task should always find
 the queue empty. */
-#define mainQUEUE_LENGTH					( 1 )
+#define mainDEMOBLINKY_QUEUE_LENGTH			( 1 )
 
 /* Values passed to the two tasks just to check the task parameter
 functionality. */
-#define mainQUEUE_SEND_PARAMETER			( ( unsigned int ) 0x1111 )
-#define mainQUEUE_RECEIVE_PARAMETER			( ( unsigned int ) 0x22 )
+#define mainDEMOBLINKY_SEND_PARAMETER		( ( unsigned int ) 0x1111 )
+#define mainDEMOBLINKY_RECEIVE_PARAMETER	( ( unsigned int ) 0x22 )
 
 /* LED that is toggled every time the message is received */
-#define mainLEDBLINK_TASK_LED			( 6 )
+#define mainDEMOBLINKY_LED					( 6 )
+
+/* LED used by the serial port tasks.  This is toggled on each character Tx,
+and mainCOM_TEST_LED + 1 is toggles on each character Rx. */
+#define mainCOM_TEST_LED					( 5 )
+
+/* LED that is toggled by the check task.  The check task periodically checks
+that all the other tasks are operating without error.  If no errors are found
+the LED is toggled.  If an error is found at any time the LED is never toggles
+again. */
+#define mainCHECK_TASK_LED					( 4 )
 
 /* LED that indicates an unexpected error (vAssertCalled) */
-#define mainASSERTCALLED_LED			( 7 )
+#define mainASSERTCALLED_LED				( 7 )
+
+/* The number of coroutines to create. */
+#define mainNUM_FLASH_COROUTINES			( 3 )
 
 /*-----------------------------------------------------------*/
 
@@ -150,6 +155,17 @@ functionality. */
  */
 static void prvQueueReceiveTask( void *pvParameters );
 static void prvQueueSendTask( void *pvParameters );
+
+/*
+ * The task function for the "Check" task.
+ */
+static void vErrorChecks( void *pvParameters );
+
+/*
+ * Checks the unique counts of other tasks to ensure they are still operational.
+ * Flashes an LED if everything is okay.
+ */
+static void prvCheckOtherTasksAreStillRunning( void );
 
 /*-----------------------------------------------------------*/
 
@@ -161,22 +177,36 @@ static QueueHandle_t xQueue = NULL;
 int main( void )
 {
 	/* Create the queue. */
-	xQueue = xQueueCreate( mainQUEUE_LENGTH, sizeof( unsigned char ) );
+	xQueue = xQueueCreate( mainDEMOBLINKY_QUEUE_LENGTH, sizeof( unsigned char ) );
 
 	/* Setup the LED's for output. */
 	vParTestInitialise();
+
+	/* Demo Blinky tasks */
 	if( xQueue != NULL )
 	{
 		/* Start the two tasks as described in the comments at the top of this file. */
 		xTaskCreate( prvQueueReceiveTask,					/* The function that implements the task. */
 					"RX", 									/* The text name assigned to the task - for debug only as it is not used by the kernel. */
 					configMINIMAL_STACK_SIZE, 				/* The size of the stack to allocate to the task. */
-					( void * ) mainQUEUE_RECEIVE_PARAMETER, /* The parameter passed to the task - just to check the functionality. */
-					mainQUEUE_RECEIVE_TASK_PRIORITY, 		/* The priority assigned to the task. */
+					( void * ) mainDEMOBLINKY_RECEIVE_PARAMETER, /* The parameter passed to the task - just to check the functionality. */
+					mainDEMOBLINKY_RECEIVE_PRIORITY, 		/* The priority assigned to the task. */
 					NULL );									/* The task handle is not required, so NULL is passed. */
 
-		xTaskCreate( prvQueueSendTask, "TX", configMINIMAL_STACK_SIZE, ( void * ) mainQUEUE_SEND_PARAMETER, mainQUEUE_SEND_TASK_PRIORITY, NULL );
+		xTaskCreate( prvQueueSendTask, "TX", configMINIMAL_STACK_SIZE, ( void * ) mainDEMOBLINKY_SEND_PARAMETER, mainDEMOBLINKY_SEND_PRIORITY, NULL );
 	}
+
+	/* Demo AVR323 tasks */
+	vStartIntegerMathTasks( tskIDLE_PRIORITY );
+	vAltStartComTestTasks( mainCOM_TEST_PRIORITY, mainCOM_TEST_BAUD_RATE, mainCOM_TEST_LED );
+	vStartPolledQueueTasks( mainQUEUE_POLL_PRIORITY );
+	vStartRegTestTasks();
+
+	/* Create the tasks defined within this file. */
+	xTaskCreate( vErrorChecks, "Check", configMINIMAL_STACK_SIZE, NULL, mainCHECK_TASK_PRIORITY, NULL );
+
+	/* Create the co-routines that flash the LED's. */
+	vStartFlashCoRoutines( mainNUM_FLASH_COROUTINES );
 
 	/* In this port, to use preemptive scheduler define configUSE_PREEMPTION
 	as 1 in portmacro.h.  To use the cooperative scheduler define
@@ -191,14 +221,14 @@ static void prvQueueSendTask( void *pvParameters )
 {
 TickType_t xNextWakeTime;
 const unsigned char ucValueToSend = 100;
-const TickType_t xBlockTime = pdMS_TO_TICKS( mainQUEUE_SEND_FREQUENCY_MS );
+const TickType_t xBlockTime = pdMS_TO_TICKS( mainDEMOBLINKY_FREQUENCY_MS );
 
 	/* Remove compiler warning in the case that configASSERT() is not
 	defined. */
 	( void ) pvParameters;
 
 	/* Check the task parameter is as expected. */
-	configASSERT( ( ( unsigned int ) pvParameters ) == mainQUEUE_SEND_PARAMETER );
+	configASSERT( ( ( unsigned int ) pvParameters ) == mainDEMOBLINKY_SEND_PARAMETER );
 
 	/* Initialize xNextWakeTime - this only needs to be done once. */
 	xNextWakeTime = xTaskGetTickCount();
@@ -229,7 +259,7 @@ unsigned char ucReceivedValue;
 	( void ) pvParameters;
 
 	/* Check the task parameter is as expected. */
-	configASSERT( ( ( unsigned int ) pvParameters ) == mainQUEUE_RECEIVE_PARAMETER );
+	configASSERT( ( ( unsigned int ) pvParameters ) == mainDEMOBLINKY_RECEIVE_PARAMETER );
 
 	for( ;; )
 	{
@@ -244,10 +274,67 @@ unsigned char ucReceivedValue;
 		{
 			/* The Windows Blinky Demo prints a message with printf().
 			 * In Arduino, we'll just blink a LED */
-			vParTestToggleLED(mainLEDBLINK_TASK_LED);
+			vParTestToggleLED(mainDEMOBLINKY_LED);
 
 			ucReceivedValue = 0U;
 		}
+	}
+}
+/*-----------------------------------------------------------*/
+
+static void vErrorChecks( void *pvParameters )
+{
+static volatile unsigned long ulDummyVariable = 3UL;
+
+	/* The parameters are not used. */
+	( void ) pvParameters;
+
+	/* Cycle for ever, delaying then checking all the other tasks are still
+	operating without error. */
+	for( ;; )
+	{
+		vTaskDelay( mainCHECK_PERIOD );
+
+		/* Perform a bit of 32bit maths to ensure the registers used by the
+		integer tasks get some exercise. The result here is not important -
+		see the demo application documentation for more info. */
+		ulDummyVariable *= 3;
+
+		prvCheckOtherTasksAreStillRunning();
+	}
+}
+
+/*-----------------------------------------------------------*/
+
+static void prvCheckOtherTasksAreStillRunning( void )
+{
+static portBASE_TYPE xErrorHasOccurred = pdFALSE;
+
+	if( xAreIntegerMathsTaskStillRunning() != pdTRUE )
+	{
+		xErrorHasOccurred = pdTRUE;
+	}
+
+	if( xAreComTestTasksStillRunning() != pdTRUE )
+	{
+		xErrorHasOccurred = pdTRUE;
+	}
+
+	if( xArePollingQueuesStillRunning() != pdTRUE )
+	{
+		xErrorHasOccurred = pdTRUE;
+	}
+
+	if( xAreRegTestTasksStillRunning() != pdTRUE )
+	{
+		xErrorHasOccurred = pdTRUE;
+	}
+
+	if( xErrorHasOccurred == pdFALSE )
+	{
+		/* Toggle the LED if everything is okay so we know if an error occurs even if not
+		using console IO. */
+		vParTestToggleLED( mainCHECK_TASK_LED );
 	}
 }
 /*-----------------------------------------------------------*/
@@ -261,3 +348,8 @@ void vAssertCalled( unsigned long ulLine, const char * const pcFileName )
 	vParTestSetLED(mainASSERTCALLED_LED, pdTRUE);
 }
 /*-----------------------------------------------------------*/
+
+void vApplicationIdleHook( void )
+{
+	vCoRoutineSchedule();
+}

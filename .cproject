@@ -35,10 +35,10 @@
 								<option id="de.innot.avreclipse.compiler.option.language.uchar.1977291167" name="char is unsigned (-funsigned-char)" superClass="de.innot.avreclipse.compiler.option.language.uchar" value="false" valueType="boolean"/>
 								<option id="de.innot.avreclipse.compiler.option.language.ubitfields.653722832" name="bitfields are unsigned (-funsigned-bitfields)" superClass="de.innot.avreclipse.compiler.option.language.ubitfields" value="false" valueType="boolean"/>
 								<option id="de.innot.avreclipse.compiler.option.incpath.706835848" name="Include Paths (-I)" superClass="de.innot.avreclipse.compiler.option.incpath" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_ArduinoMEGA-Demo_Blinky}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_ArduinoMEGA-Demo_Blinky/FreeRTOS/Source/portable/WinAVR/ATmega2560}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_ArduinoMEGA-Demo_Blinky/FreeRTOS/Source/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_ArduinoMEGA-Demo_Blinky/FreeRTOS/Demo/Common/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_ArduinoMEGA-Demo_AVR323}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_ArduinoMEGA-Demo_AVR323/FreeRTOS/Source/portable/WinAVR/ATmega2560}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_ArduinoMEGA-Demo_AVR323/FreeRTOS/Demo/Common/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_ArduinoMEGA-Demo_AVR323/FreeRTOS/Source/include}&quot;"/>
 								</option>
 								<inputType id="de.innot.avreclipse.compiler.winavr.input.1105930432" name="C Source Files" superClass="de.innot.avreclipse.compiler.winavr.input"/>
 							</tool>

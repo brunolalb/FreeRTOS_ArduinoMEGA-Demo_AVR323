@@ -68,114 +68,138 @@
 */
 
 /*
- * Demo Blinky project
- *
- * ArduinoMEGA with FreeRTOS 9.0.0
- *
- * Compiler: WinAVR
- * Burner: AVR Dude (STK500v2)
- * IDE: Eclipse Mars.2
- *
- * Description::
- * main() creates one queue, and two tasks. It then starts the scheduler.
- *
- * The Queue Send Task:
- * The queue send task is implemented by the prvQueueSendTask() function in
- * this file.  prvQueueSendTask() sits in a loop that causes it to repeatedly
- * block for 200 (simulated as far as the scheduler is concerned, but in
- * reality much longer - see notes above) milliseconds, before sending the
- * value 100 to the queue that was created within main_blinky().  Once the
- * value is sent, the task loops back around to block for another 200
- * (simulated) milliseconds.
- *
- * The Queue Receive Task:
- * The queue receive task is implemented by the prvQueueReceiveTask() function
- * in this file.  prvQueueReceiveTask() sits in a loop where it repeatedly
- * blocks on attempts to read data from the queue that was created within
- * main_blinky().  When data is received, the task checks the value of the
- * data, and if the value equals the expected 100, outputs a message.  The
- * 'block time' parameter passed to the queue receive function specifies that
- * the task should be held in the Blocked state indefinitely to wait for data
- * to be available on the queue.  The queue receive task will only leave the
- * Blocked state when the queue send task writes to the queue.  As the queue
- * send task writes to the queue every 200 (simulated - see notes above)
- * milliseconds, the queue receive task leaves the Blocked state every 200
- * milliseconds, and therefore outputs a message every 200 milliseconds.
- *
- * Initial version (2016-08-05): Bruno Landau Albrecht (brunolalb@gmail.com)
- *
+ * Creates one or more tasks that repeatedly perform a set of integer
+ * calculations.  The result of each run-time calculation is compared to the 
+ * known expected result - with a mismatch being indicative of an error in the
+ * context switch mechanism.
  */
 
+#include <stdlib.h>
+
+/* Scheduler include files. */
 #include "FreeRTOS.h"
 #include "task.h"
-#include "partest.h"
 
-/*-----------------------------------------------------------
- * Simple parallel port IO routines.
- *-----------------------------------------------------------*/
+/* Demo program include files. */
+#include "integer.h"
 
-#define partstLEDS_OUTPUT			( ( unsigned char ) 0b11110000 )
-#define partstALL_OUTPUTS_OFF		( ( unsigned char ) 0b00001111 )
-#define partstMAX_OUTPUT_LED		( ( unsigned char ) 7 )
-#define partstMIN_OUTPUT_LED		( ( unsigned char ) 4 )
+/* The constants used in the calculation. */
+#define intgCONST1				( ( long ) 123 )
+#define intgCONST2				( ( long ) 234567 )
+#define intgCONST3				( ( long ) -3 )
+#define intgCONST4				( ( long ) 7 )
+#define intgEXPECTED_ANSWER		( ( ( intgCONST1 + intgCONST2 ) * intgCONST3 ) / intgCONST4 )
 
-static volatile unsigned char ucCurrentOutputValue = partstALL_OUTPUTS_OFF; /*lint !e956 File scope parameters okay here. */
+#define intgSTACK_SIZE			configMINIMAL_STACK_SIZE
+
+/* As this is the minimal version, we will only create one task. */
+#define intgNUMBER_OF_TASKS		( 1 )
+
+/* The task function.  Repeatedly performs a 32 bit calculation, checking the
+result against the expected result.  If the result is incorrect then the
+context switch must have caused some corruption. */
+static portTASK_FUNCTION_PROTO( vCompeteingIntMathTask, pvParameters );
+
+/* Variables that are set to true within the calculation task to indicate
+that the task is still executing.  The check task sets the variable back to
+false, flagging an error if the variable is still false the next time it
+is called. */
+static volatile BaseType_t xTaskCheck[ intgNUMBER_OF_TASKS ] = { ( BaseType_t ) pdFALSE };
 
 /*-----------------------------------------------------------*/
 
-void vParTestInitialise( void )
+void vStartIntegerMathTasks( UBaseType_t uxPriority )
 {
-	ucCurrentOutputValue = partstALL_OUTPUTS_OFF;
+short sTask;
 
-	/* Set port B direction to outputs.  Start with all output off. */
-	DDRB = partstLEDS_OUTPUT;
-	PORTB &= ucCurrentOutputValue;
-}
-/*-----------------------------------------------------------*/
-
-void vParTestSetLED( unsigned portBASE_TYPE uxLED, signed portBASE_TYPE xValue )
-{
-unsigned char ucBit = ( unsigned char ) 1;
-
-	if(( uxLED <= partstMAX_OUTPUT_LED ) && ( uxLED >= partstMIN_OUTPUT_LED ))
+	for( sTask = 0; sTask < intgNUMBER_OF_TASKS; sTask++ )
 	{
-		ucBit <<= uxLED;	
-
-		vTaskSuspendAll();
-		{
-			if( xValue == pdFALSE )
-			{
-				ucBit ^= ( unsigned char ) 0xff;
-				ucCurrentOutputValue &= ucBit;
-				PORTB &= ucCurrentOutputValue;
-			}
-			else
-			{
-				ucCurrentOutputValue |= ucBit;
-				PORTB |= ucCurrentOutputValue;
-			}
-		}
-		xTaskResumeAll();
+		xTaskCreate( vCompeteingIntMathTask, "IntMath", intgSTACK_SIZE, ( void * ) &( xTaskCheck[ sTask ] ), uxPriority, ( TaskHandle_t * ) NULL );
 	}
 }
 /*-----------------------------------------------------------*/
 
-void vParTestToggleLED( unsigned portBASE_TYPE uxLED )
+static portTASK_FUNCTION( vCompeteingIntMathTask, pvParameters )
 {
-unsigned char ucBit;
+/* These variables are all effectively set to constants so they are volatile to
+ensure the compiler does not just get rid of them. */
+volatile long lValue;
+short sError = pdFALSE;
+volatile BaseType_t *pxTaskHasExecuted;
 
-	if(( uxLED <= partstMAX_OUTPUT_LED ) && ( uxLED >= partstMIN_OUTPUT_LED ))
+	/* Set a pointer to the variable we are going to set to true each
+	iteration.  This is also a good test of the parameter passing mechanism
+	within each port. */
+	pxTaskHasExecuted = ( volatile BaseType_t * ) pvParameters;
+
+	/* Keep performing a calculation and checking the result against a constant. */
+	for( ;; )
 	{
-		ucBit = ( ( unsigned char ) 1 ) << uxLED;
+		/* Perform the calculation.  This will store partial value in
+		registers, resulting in a good test of the context switch mechanism. */
+		lValue = intgCONST1;
+		lValue += intgCONST2;
 
-		vTaskSuspendAll();
+		/* Yield in case cooperative scheduling is being used. */
+		#if configUSE_PREEMPTION == 0
 		{
-
-			PINB = ucBit;
-			ucCurrentOutputValue = PORTB;
+			taskYIELD();
 		}
-		xTaskResumeAll();			
+		#endif
+
+		/* Finish off the calculation. */
+		lValue *= intgCONST3;
+		lValue /= intgCONST4;
+
+		/* If the calculation is found to be incorrect we stop setting the 
+		TaskHasExecuted variable so the check task can see an error has 
+		occurred. */
+		if( lValue != intgEXPECTED_ANSWER ) /*lint !e774 volatile used to prevent this being optimised out. */
+		{
+			sError = pdTRUE;
+		}
+
+		if( sError == pdFALSE )
+		{
+			/* We have not encountered any errors, so set the flag that show
+			we are still executing.  This will be periodically cleared by
+			the check task. */
+			portENTER_CRITICAL();
+				*pxTaskHasExecuted = pdTRUE;
+			portEXIT_CRITICAL();
+		}
+
+		/* Yield in case cooperative scheduling is being used. */
+		#if configUSE_PREEMPTION == 0
+		{
+			taskYIELD();
+		}
+		#endif
 	}
 }
+/*-----------------------------------------------------------*/
 
+/* This is called to check that all the created tasks are still running. */
+BaseType_t xAreIntegerMathsTaskStillRunning( void )
+{
+BaseType_t xReturn = pdTRUE;
+short sTask;
+
+	/* Check the maths tasks are still running by ensuring their check variables 
+	are still being set to true. */
+	for( sTask = 0; sTask < intgNUMBER_OF_TASKS; sTask++ )
+	{
+		if( xTaskCheck[ sTask ] == pdFALSE )
+		{
+			/* The check has not incremented so an error exists. */
+			xReturn = pdFALSE;
+		}
+
+		/* Reset the check variable so we can tell if it has been set by
+		the next time around. */
+		xTaskCheck[ sTask ] = pdFALSE;
+	}
+
+	return xReturn;
+}
 

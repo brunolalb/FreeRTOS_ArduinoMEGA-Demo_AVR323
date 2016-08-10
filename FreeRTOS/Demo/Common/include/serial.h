@@ -67,115 +67,74 @@
     1 tab == 4 spaces!
 */
 
-/*
- * Demo Blinky project
- *
- * ArduinoMEGA with FreeRTOS 9.0.0
- *
- * Compiler: WinAVR
- * Burner: AVR Dude (STK500v2)
- * IDE: Eclipse Mars.2
- *
- * Description::
- * main() creates one queue, and two tasks. It then starts the scheduler.
- *
- * The Queue Send Task:
- * The queue send task is implemented by the prvQueueSendTask() function in
- * this file.  prvQueueSendTask() sits in a loop that causes it to repeatedly
- * block for 200 (simulated as far as the scheduler is concerned, but in
- * reality much longer - see notes above) milliseconds, before sending the
- * value 100 to the queue that was created within main_blinky().  Once the
- * value is sent, the task loops back around to block for another 200
- * (simulated) milliseconds.
- *
- * The Queue Receive Task:
- * The queue receive task is implemented by the prvQueueReceiveTask() function
- * in this file.  prvQueueReceiveTask() sits in a loop where it repeatedly
- * blocks on attempts to read data from the queue that was created within
- * main_blinky().  When data is received, the task checks the value of the
- * data, and if the value equals the expected 100, outputs a message.  The
- * 'block time' parameter passed to the queue receive function specifies that
- * the task should be held in the Blocked state indefinitely to wait for data
- * to be available on the queue.  The queue receive task will only leave the
- * Blocked state when the queue send task writes to the queue.  As the queue
- * send task writes to the queue every 200 (simulated - see notes above)
- * milliseconds, the queue receive task leaves the Blocked state every 200
- * milliseconds, and therefore outputs a message every 200 milliseconds.
- *
- * Initial version (2016-08-05): Bruno Landau Albrecht (brunolalb@gmail.com)
- *
- */
+#ifndef SERIAL_COMMS_H
+#define SERIAL_COMMS_H
 
-#include "FreeRTOS.h"
-#include "task.h"
-#include "partest.h"
+typedef void * xComPortHandle;
 
-/*-----------------------------------------------------------
- * Simple parallel port IO routines.
- *-----------------------------------------------------------*/
+typedef enum
+{ 
+	serCOM1, 
+	serCOM2, 
+	serCOM3, 
+	serCOM4, 
+	serCOM5, 
+	serCOM6, 
+	serCOM7, 
+	serCOM8 
+} eCOMPort;
 
-#define partstLEDS_OUTPUT			( ( unsigned char ) 0b11110000 )
-#define partstALL_OUTPUTS_OFF		( ( unsigned char ) 0b00001111 )
-#define partstMAX_OUTPUT_LED		( ( unsigned char ) 7 )
-#define partstMIN_OUTPUT_LED		( ( unsigned char ) 4 )
+typedef enum 
+{ 
+	serNO_PARITY, 
+	serODD_PARITY, 
+	serEVEN_PARITY, 
+	serMARK_PARITY, 
+	serSPACE_PARITY 
+} eParity;
 
-static volatile unsigned char ucCurrentOutputValue = partstALL_OUTPUTS_OFF; /*lint !e956 File scope parameters okay here. */
+typedef enum 
+{ 
+	serSTOP_1, 
+	serSTOP_2 
+} eStopBits;
 
-/*-----------------------------------------------------------*/
+typedef enum 
+{ 
+	serBITS_5, 
+	serBITS_6, 
+	serBITS_7, 
+	serBITS_8 
+} eDataBits;
 
-void vParTestInitialise( void )
-{
-	ucCurrentOutputValue = partstALL_OUTPUTS_OFF;
+typedef enum 
+{ 
+	ser50,		
+	ser75,		
+	ser110,		
+	ser134,		
+	ser150,    
+	ser200,
+	ser300,		
+	ser600,		
+	ser1200,	
+	ser1800,	
+	ser2400,   
+	ser4800,
+	ser9600,		
+	ser19200,	
+	ser38400,	
+	ser57600,	
+	ser115200
+} eBaud;
 
-	/* Set port B direction to outputs.  Start with all output off. */
-	DDRB = partstLEDS_OUTPUT;
-	PORTB &= ucCurrentOutputValue;
-}
-/*-----------------------------------------------------------*/
+xComPortHandle xSerialPortInitMinimal( unsigned long ulWantedBaud, unsigned portBASE_TYPE uxQueueLength );
+xComPortHandle xSerialPortInit( eCOMPort ePort, eBaud eWantedBaud, eParity eWantedParity, eDataBits eWantedDataBits, eStopBits eWantedStopBits, unsigned portBASE_TYPE uxBufferLength );
+void vSerialPutString( xComPortHandle pxPort, const signed char * const pcString, unsigned short usStringLength );
+signed portBASE_TYPE xSerialGetChar( xComPortHandle pxPort, signed char *pcRxedChar, TickType_t xBlockTime );
+signed portBASE_TYPE xSerialPutChar( xComPortHandle pxPort, signed char cOutChar, TickType_t xBlockTime );
+portBASE_TYPE xSerialWaitForSemaphore( xComPortHandle xPort );
+void vSerialClose( xComPortHandle xPort );
 
-void vParTestSetLED( unsigned portBASE_TYPE uxLED, signed portBASE_TYPE xValue )
-{
-unsigned char ucBit = ( unsigned char ) 1;
-
-	if(( uxLED <= partstMAX_OUTPUT_LED ) && ( uxLED >= partstMIN_OUTPUT_LED ))
-	{
-		ucBit <<= uxLED;	
-
-		vTaskSuspendAll();
-		{
-			if( xValue == pdFALSE )
-			{
-				ucBit ^= ( unsigned char ) 0xff;
-				ucCurrentOutputValue &= ucBit;
-				PORTB &= ucCurrentOutputValue;
-			}
-			else
-			{
-				ucCurrentOutputValue |= ucBit;
-				PORTB |= ucCurrentOutputValue;
-			}
-		}
-		xTaskResumeAll();
-	}
-}
-/*-----------------------------------------------------------*/
-
-void vParTestToggleLED( unsigned portBASE_TYPE uxLED )
-{
-unsigned char ucBit;
-
-	if(( uxLED <= partstMAX_OUTPUT_LED ) && ( uxLED >= partstMIN_OUTPUT_LED ))
-	{
-		ucBit = ( ( unsigned char ) 1 ) << uxLED;
-
-		vTaskSuspendAll();
-		{
-
-			PINB = ucBit;
-			ucCurrentOutputValue = PORTB;
-		}
-		xTaskResumeAll();			
-	}
-}
-
+#endif
 

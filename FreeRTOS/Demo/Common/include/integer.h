@@ -67,115 +67,12 @@
     1 tab == 4 spaces!
 */
 
-/*
- * Demo Blinky project
- *
- * ArduinoMEGA with FreeRTOS 9.0.0
- *
- * Compiler: WinAVR
- * Burner: AVR Dude (STK500v2)
- * IDE: Eclipse Mars.2
- *
- * Description::
- * main() creates one queue, and two tasks. It then starts the scheduler.
- *
- * The Queue Send Task:
- * The queue send task is implemented by the prvQueueSendTask() function in
- * this file.  prvQueueSendTask() sits in a loop that causes it to repeatedly
- * block for 200 (simulated as far as the scheduler is concerned, but in
- * reality much longer - see notes above) milliseconds, before sending the
- * value 100 to the queue that was created within main_blinky().  Once the
- * value is sent, the task loops back around to block for another 200
- * (simulated) milliseconds.
- *
- * The Queue Receive Task:
- * The queue receive task is implemented by the prvQueueReceiveTask() function
- * in this file.  prvQueueReceiveTask() sits in a loop where it repeatedly
- * blocks on attempts to read data from the queue that was created within
- * main_blinky().  When data is received, the task checks the value of the
- * data, and if the value equals the expected 100, outputs a message.  The
- * 'block time' parameter passed to the queue receive function specifies that
- * the task should be held in the Blocked state indefinitely to wait for data
- * to be available on the queue.  The queue receive task will only leave the
- * Blocked state when the queue send task writes to the queue.  As the queue
- * send task writes to the queue every 200 (simulated - see notes above)
- * milliseconds, the queue receive task leaves the Blocked state every 200
- * milliseconds, and therefore outputs a message every 200 milliseconds.
- *
- * Initial version (2016-08-05): Bruno Landau Albrecht (brunolalb@gmail.com)
- *
- */
+#ifndef INTEGER_TASKS_H
+#define INTEGER_TASKS_H
 
-#include "FreeRTOS.h"
-#include "task.h"
-#include "partest.h"
+void vStartIntegerMathTasks( UBaseType_t uxPriority );
+BaseType_t xAreIntegerMathsTaskStillRunning( void );
 
-/*-----------------------------------------------------------
- * Simple parallel port IO routines.
- *-----------------------------------------------------------*/
-
-#define partstLEDS_OUTPUT			( ( unsigned char ) 0b11110000 )
-#define partstALL_OUTPUTS_OFF		( ( unsigned char ) 0b00001111 )
-#define partstMAX_OUTPUT_LED		( ( unsigned char ) 7 )
-#define partstMIN_OUTPUT_LED		( ( unsigned char ) 4 )
-
-static volatile unsigned char ucCurrentOutputValue = partstALL_OUTPUTS_OFF; /*lint !e956 File scope parameters okay here. */
-
-/*-----------------------------------------------------------*/
-
-void vParTestInitialise( void )
-{
-	ucCurrentOutputValue = partstALL_OUTPUTS_OFF;
-
-	/* Set port B direction to outputs.  Start with all output off. */
-	DDRB = partstLEDS_OUTPUT;
-	PORTB &= ucCurrentOutputValue;
-}
-/*-----------------------------------------------------------*/
-
-void vParTestSetLED( unsigned portBASE_TYPE uxLED, signed portBASE_TYPE xValue )
-{
-unsigned char ucBit = ( unsigned char ) 1;
-
-	if(( uxLED <= partstMAX_OUTPUT_LED ) && ( uxLED >= partstMIN_OUTPUT_LED ))
-	{
-		ucBit <<= uxLED;	
-
-		vTaskSuspendAll();
-		{
-			if( xValue == pdFALSE )
-			{
-				ucBit ^= ( unsigned char ) 0xff;
-				ucCurrentOutputValue &= ucBit;
-				PORTB &= ucCurrentOutputValue;
-			}
-			else
-			{
-				ucCurrentOutputValue |= ucBit;
-				PORTB |= ucCurrentOutputValue;
-			}
-		}
-		xTaskResumeAll();
-	}
-}
-/*-----------------------------------------------------------*/
-
-void vParTestToggleLED( unsigned portBASE_TYPE uxLED )
-{
-unsigned char ucBit;
-
-	if(( uxLED <= partstMAX_OUTPUT_LED ) && ( uxLED >= partstMIN_OUTPUT_LED ))
-	{
-		ucBit = ( ( unsigned char ) 1 ) << uxLED;
-
-		vTaskSuspendAll();
-		{
-
-			PINB = ucBit;
-			ucCurrentOutputValue = PORTB;
-		}
-		xTaskResumeAll();			
-	}
-}
+#endif
 
 
