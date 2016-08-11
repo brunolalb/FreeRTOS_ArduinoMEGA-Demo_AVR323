@@ -68,7 +68,7 @@
 */
 
 /*
- * Demo Blinky project
+ * Demo AVR323 project
  *
  * ArduinoMEGA with FreeRTOS 9.0.0
  *
@@ -76,33 +76,11 @@
  * Burner: AVR Dude (STK500v2)
  * IDE: Eclipse Mars.2
  *
- * Description::
- * main() creates one queue, and two tasks. It then starts the scheduler.
+ * Description:
+ * 	Implementation of the same Demo project available for AVR323 (WinAVR).
+ * 	The code for Demo Blinky was kept.
  *
- * The Queue Send Task:
- * The queue send task is implemented by the prvQueueSendTask() function in
- * this file.  prvQueueSendTask() sits in a loop that causes it to repeatedly
- * block for 200 (simulated as far as the scheduler is concerned, but in
- * reality much longer - see notes above) milliseconds, before sending the
- * value 100 to the queue that was created within main_blinky().  Once the
- * value is sent, the task loops back around to block for another 200
- * (simulated) milliseconds.
- *
- * The Queue Receive Task:
- * The queue receive task is implemented by the prvQueueReceiveTask() function
- * in this file.  prvQueueReceiveTask() sits in a loop where it repeatedly
- * blocks on attempts to read data from the queue that was created within
- * main_blinky().  When data is received, the task checks the value of the
- * data, and if the value equals the expected 100, outputs a message.  The
- * 'block time' parameter passed to the queue receive function specifies that
- * the task should be held in the Blocked state indefinitely to wait for data
- * to be available on the queue.  The queue receive task will only leave the
- * Blocked state when the queue send task writes to the queue.  As the queue
- * send task writes to the queue every 200 (simulated - see notes above)
- * milliseconds, the queue receive task leaves the Blocked state every 200
- * milliseconds, and therefore outputs a message every 200 milliseconds.
- *
- * Initial version (2016-08-05): Bruno Landau Albrecht (brunolalb@gmail.com)
+ * Initial version (2016-08-11): Bruno Landau Albrecht (brunolalb@gmail.com)
  *
  */
 
@@ -130,7 +108,7 @@
 #define configTICK_RATE_HZ			( ( TickType_t ) 1000 )
 #define configMAX_PRIORITIES		( 4 )
 #define configMINIMAL_STACK_SIZE	( ( unsigned short ) 85 )
-#define configTOTAL_HEAP_SIZE		( (size_t ) ( 7500 ) )
+#define configTOTAL_HEAP_SIZE		( (size_t ) ( 7000 ) )
 #define configMAX_TASK_NAME_LEN		( 8 )
 #define configUSE_TRACE_FACILITY	0
 #define configUSE_16_BIT_TICKS		1
@@ -158,7 +136,7 @@ extern void vAssertCalled( unsigned long ulLine, const char * const pcFileName )
 #define configASSERT( x ) if( ( x ) == 0 ) vAssertCalled( __LINE__, __FILE__ )
 
 /* Due to problems with integer overflow, this macro is defined here */
-#define pdMS_TO_TICKS( xTimeInMs ) ( ( TickType_t ) ( ( ( unsigned long ) ( xTimeInMs ) * ( unsigned long ) configTICK_RATE_HZ ) / ( unsigned long ) 1000 ) )
+#define pdMS_TO_TICKS( xTimeInMs ) ( ( TickType_t ) ( ( ( uint32_t ) ( xTimeInMs ) * ( uint32_t ) configTICK_RATE_HZ ) / ( uint32_t ) 1000 ) )
 
 
 #endif /* FREERTOS_CONFIG_H */

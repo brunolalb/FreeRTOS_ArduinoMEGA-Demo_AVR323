@@ -67,6 +67,23 @@
     1 tab == 4 spaces!
 */
 
+/*
+ * Demo AVR323 project
+ *
+ * ArduinoMEGA with FreeRTOS 9.0.0
+ *
+ * Compiler: WinAVR
+ * Burner: AVR Dude (STK500v2)
+ * IDE: Eclipse Mars.2
+ *
+ * Description:
+ * 	Tests with the microcontroller internal registers
+ * 	Based on the AVR323 official Demo project
+ *
+ * Initial version (2016-08-11): Bruno Landau Albrecht (brunolalb@gmail.com)
+ *
+ */
+
 /* Scheduler include files. */
 #include "FreeRTOS.h"
 #include "task.h"

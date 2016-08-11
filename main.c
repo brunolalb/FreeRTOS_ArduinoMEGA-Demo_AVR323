@@ -78,8 +78,9 @@
  *
  * Description:
  * 	Implementation of the same Demo project available for AVR323 (WinAVR).
+ * 	The code for Demo Blinky was kept.
  *
- * Initial version (2016-08-05): Bruno Landau Albrecht (brunolalb@gmail.com)
+ * Initial version (2016-08-11): Bruno Landau Albrecht (brunolalb@gmail.com)
  *
  */
 
@@ -100,6 +101,7 @@
 #include "PollQ.h"
 #include "RegTest/regtest.h"
 #include "crflash.h"
+#include "croutine.h"
 
 /* Priority definitions for most of the tasks in the demo application.  Some
 tasks just use the idle priority. */
@@ -117,7 +119,7 @@ to ticks using the portTICK_PERIOD_MS constant. */
 #define mainDEMOBLINKY_FREQUENCY_MS			( ( TickType_t ) (200) / portTICK_PERIOD_MS )
 
 /* The period between executions of the check task. */
-#define mainCHECK_PERIOD					( ( TickType_t ) 3000 / portTICK_PERIOD_MS  )
+#define mainCHECK_PERIOD					( ( TickType_t ) 1000 / portTICK_PERIOD_MS  )
 
 /* The number of items the queue can hold.  This is 1 as the receive task
 will remove items as they are added, meaning the send task should always find
@@ -129,24 +131,34 @@ functionality. */
 #define mainDEMOBLINKY_SEND_PARAMETER		( ( unsigned int ) 0x1111 )
 #define mainDEMOBLINKY_RECEIVE_PARAMETER	( ( unsigned int ) 0x22 )
 
-/* LED that is toggled every time the message is received */
-#define mainDEMOBLINKY_LED					( 6 )
+/* LED that is toggled every time the message is received for the Demo Blinky - Digital Pin 50 */
+#define mainDEMOBLINKY_LED					( 3 )
 
 /* LED used by the serial port tasks.  This is toggled on each character Tx,
-and mainCOM_TEST_LED + 1 is toggles on each character Rx. */
-#define mainCOM_TEST_LED					( 5 )
+and mainCOM_TEST_LED + 1 is toggles on each character Rx.  - Digital Pin 10 and 11 */
+#define mainCOM_TEST_LED					( 4 )
+#define mainCOM_TEST_LED1					( 5 )
 
 /* LED that is toggled by the check task.  The check task periodically checks
 that all the other tasks are operating without error.  If no errors are found
 the LED is toggled.  If an error is found at any time the LED is never toggles
-again. */
-#define mainCHECK_TASK_LED					( 4 )
+again. Digital Pin 12 */
+#define mainCHECK_TASK_LED					( 6 )
 
-/* LED that indicates an unexpected error (vAssertCalled) */
+/* LED that indicates an unexpected error (vAssertCalled) - Digital Pin 13*/
 #define mainASSERTCALLED_LED				( 7 )
 
 /* The number of coroutines to create. */
 #define mainNUM_FLASH_COROUTINES			( 3 )
+
+/* Flags to enable each functionality */
+#define mainDEMO_BLINKY						1
+#define mainDEMO_INTEGER					1
+#define mainDEMO_COMTEST					1
+#define mainDEMO_POLLEDQUEUE				1
+#define mainDEMO_REGTEST					1
+#define mainDEMO_ERRORCHECK					1
+#define mainDEMO_COROUTINE					1
 
 /*-----------------------------------------------------------*/
 
@@ -176,11 +188,12 @@ static QueueHandle_t xQueue = NULL;
 
 int main( void )
 {
-	/* Create the queue. */
-	xQueue = xQueueCreate( mainDEMOBLINKY_QUEUE_LENGTH, sizeof( unsigned char ) );
-
 	/* Setup the LED's for output. */
 	vParTestInitialise();
+
+#if( mainDEMO_BLINKY == 1 )
+	/* Create the queue. */
+	xQueue = xQueueCreate( mainDEMOBLINKY_QUEUE_LENGTH, sizeof( unsigned char ) );
 
 	/* Demo Blinky tasks */
 	if( xQueue != NULL )
@@ -195,18 +208,31 @@ int main( void )
 
 		xTaskCreate( prvQueueSendTask, "TX", configMINIMAL_STACK_SIZE, ( void * ) mainDEMOBLINKY_SEND_PARAMETER, mainDEMOBLINKY_SEND_PRIORITY, NULL );
 	}
+#endif
 
 	/* Demo AVR323 tasks */
+#if( mainDEMO_INTEGER == 1)
 	vStartIntegerMathTasks( tskIDLE_PRIORITY );
+#endif
+#if( mainDEMO_COMTEST == 1)
 	vAltStartComTestTasks( mainCOM_TEST_PRIORITY, mainCOM_TEST_BAUD_RATE, mainCOM_TEST_LED );
+#endif
+#if( mainDEMO_POLLEDQUEUE == 1 )
 	vStartPolledQueueTasks( mainQUEUE_POLL_PRIORITY );
+#endif
+#if( mainDEMO_REGTEST == 1 )
 	vStartRegTestTasks();
+#endif
 
+#if( mainDEMO_ERRORCHECK == 1 )
 	/* Create the tasks defined within this file. */
 	xTaskCreate( vErrorChecks, "Check", configMINIMAL_STACK_SIZE, NULL, mainCHECK_TASK_PRIORITY, NULL );
+#endif
 
+#if( mainDEMO_COROUTINE == 1 )
 	/* Create the co-routines that flash the LED's. */
 	vStartFlashCoRoutines( mainNUM_FLASH_COROUTINES );
+#endif
 
 	/* In this port, to use preemptive scheduler define configUSE_PREEMPTION
 	as 1 in portmacro.h.  To use the cooperative scheduler define
@@ -284,7 +310,7 @@ unsigned char ucReceivedValue;
 
 static void vErrorChecks( void *pvParameters )
 {
-static volatile unsigned long ulDummyVariable = 3UL;
+static volatile uint32_t ulDummyVariable = 3UL;
 
 	/* The parameters are not used. */
 	( void ) pvParameters;
@@ -310,25 +336,33 @@ static void prvCheckOtherTasksAreStillRunning( void )
 {
 static portBASE_TYPE xErrorHasOccurred = pdFALSE;
 
+#if( mainDEMO_INTEGER == 1)
 	if( xAreIntegerMathsTaskStillRunning() != pdTRUE )
 	{
 		xErrorHasOccurred = pdTRUE;
 	}
+#endif
 
+#if( mainDEMO_COMTEST == 1 )
 	if( xAreComTestTasksStillRunning() != pdTRUE )
 	{
 		xErrorHasOccurred = pdTRUE;
 	}
+#endif
 
+#if( mainDEMO_POLLEDQUEUE == 1 )
 	if( xArePollingQueuesStillRunning() != pdTRUE )
 	{
 		xErrorHasOccurred = pdTRUE;
 	}
+#endif
 
+#if( mainDEMO_REGTEST == 1 )
 	if( xAreRegTestTasksStillRunning() != pdTRUE )
 	{
 		xErrorHasOccurred = pdTRUE;
 	}
+#endif
 
 	if( xErrorHasOccurred == pdFALSE )
 	{
@@ -345,11 +379,13 @@ void vAssertCalled( unsigned long ulLine, const char * const pcFileName )
 	( void ) ulLine;
 	( void ) pcFileName;
 
-	vParTestSetLED(mainASSERTCALLED_LED, pdTRUE);
+	vParTestToggleLED(mainASSERTCALLED_LED);
 }
 /*-----------------------------------------------------------*/
 
 void vApplicationIdleHook( void )
 {
+#if( mainDEMO_COROUTINE == 1 )
 	vCoRoutineSchedule();
+#endif
 }
