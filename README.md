@@ -1,4 +1,4 @@
-Demo Blinky on FreeRTOS project
+Demo AVR323 for ArduinoMEGA on FreeRTOS project
 =============
 ArduinoMEGA with FreeRTOS 9.0.0
 -------------------------------
@@ -8,13 +8,12 @@ ArduinoMEGA with FreeRTOS 9.0.0
  
 ---
 
-Tasks:
+Description:
 
-* The Queue Send Task: Writes a constant value in a queue every 200 ms.
-* The Queue Receive Task: Reads the content of the queue and checks if it's right. If it is, toggles a LED.
+ * Started with the Demo Blinky and added all the functions present in the AVR323 official Demo
  
 ---
 
 Versions:
 
- * Initial version (2016-08-09): Bruno Landau Albrecht (brunolalb@gmail.com)
+ * Initial version (2016-08-11): Bruno Landau Albrecht (brunolalb@gmail.com)
